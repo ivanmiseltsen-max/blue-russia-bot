@@ -4,10 +4,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import json
 import os
 import asyncio
+from flask import Flask
+import threading
 
 # ===== НАСТРОЙКИ =====
-TOKEN = '8968112083:AAGXiHHEWQNHW1UmQSTWAPB_L6vJQjmj_8o'
-CREATOR_ID = 7743220894  # ID создателя (@eaxpa) — замени на свой
+TOKEN = '8968112083:AAGXiHHEWQNHW1UmQSTWAPB_L6vJQjmj_8o' # ← СЮДА ВСТАВЬ НОВЫЙ ТОКЕН
+CREATOR_ID = 7743220894
 FOUNDER_NAME = 'Савелий'
 
 logging.basicConfig(level=logging.INFO)
@@ -35,49 +37,35 @@ def save_data():
 
 data = load_data()
 
-# ===== ВСЕ РОЛИ (ПОЛНАЯ ИЕРАРХИЯ — ИСПРАВЛЕНА) =====
+# ===== ВСЕ РОЛИ =====
 ROLES = {
-    # Высшее руководство
     'Основатель': 0,
     'Зам.основателя': 1,
     'Специальный администратор': 2,
     'Заместитель Специального Администратора': 3,
-    
-    # Главные администраторы
     'Главный администратор': 4,
     'Основной заместитель ГА': 5,
     'Заместитель главного администратора (ЗГА)': 6,
     'Куратор администрации': 7,
-    
-    # Администраторы
     'ГС': 8,
     'Старший администратор': 9,
     'Заместитель ГС': 10,
     'Администратор': 11,
-    
-    # Модераторы
     'Старший модератор': 12,
     'Модератор': 13,
     'Младший модератор': 14,
-    
-    # Тех.специалисты (отдельная ветка)
     'Главный Тех.Специалист': 15,
     'Заместитель главного Технического Специалиста': 16,
     'Главный куратор Тех.Специалистов': 17,
     'Куратор Тех.Специалистов': 18,
     'Технический специалист': 19,
-    
-    # Доп. администрация
     'Контроль качества': 20,
     'Тестировщик': 21,
-    
-    # Обычные
     'Участник': 22
 }
 
 ROLE_NAMES = list(ROLES.keys())
 
-# ===== ПРОВЕРКА ПРАВ =====
 def get_user_role(user_id):
     return data['roles'].get(str(user_id), 'Участник')
 
@@ -87,15 +75,11 @@ def get_role_level(user_id):
 
 def is_admin(user_id):
     level = get_role_level(user_id)
-    return level <= 11  # Администратор и выше
+    return level <= 11
 
 def is_moder(user_id):
     level = get_role_level(user_id)
-    return level <= 14  # Модератор и выше
-
-def is_tech(user_id):
-    level = get_role_level(user_id)
-    return 15 <= level <= 19  # Тех.специалисты
+    return level <= 14
 
 def is_creator(user_id):
     return user_id == CREATOR_ID
@@ -105,7 +89,7 @@ def can_manage(user_id, target_id):
     target_level = get_role_level(target_id)
     return user_level < target_level
 
-# ===== ПРИВЕТСТВИЕ =====
+# ===== КОМАНДЫ БОТА =====
 async def handle_new_chat_members(update: Update, context: CallbackContext):
     for member in update.message.new_chat_members:
         if member.id == context.bot.id:
@@ -114,48 +98,31 @@ async def handle_new_chat_members(update: Update, context: CallbackContext):
                 f"🤝 Рад с вами познакомиться!\n\n"
                 f"👑 Мой создатель: товарищь **{FOUNDER_NAME}**\n"
                 f"🤖 Мой разработчик: @eaxpa\n\n"
-                f"⚡ Используй /start для начала работы\n"
-                f"📋 Команды модерации:\n"
-                f"/ban, /kick, /mute, /unmute, /warn, /unwarn"
+                f"⚡ Используй /start для начала работы"
             )
             return
-        
         user_id = member.id
         if str(user_id) not in data['roles']:
             data['roles'][str(user_id)] = 'Участник'
             save_data()
-        
-        await update.message.reply_text(
-            f"👋 Добро пожаловать, {member.full_name}!\n"
-            f"🌊 Ты в проекте BLUE RUSSIA"
-        )
+        await update.message.reply_text(f"👋 Добро пожаловать, {member.full_name}!\n🌊 Ты в проекте BLUE RUSSIA")
 
-# ===== КОМАНДЫ =====
 async def start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if str(user_id) not in data['roles']:
         data['roles'][str(user_id)] = 'Участник'
         save_data()
-    
     role = get_user_role(user_id)
-    
     keyboard = [
         [InlineKeyboardButton("👤 Мой профиль", callback_data='profile')],
         [InlineKeyboardButton("📋 Список ролей", callback_data='roles_list')],
         [InlineKeyboardButton("👑 Команда проекта", callback_data='team_list')]
     ]
-    
     if is_creator(user_id):
         keyboard.append([InlineKeyboardButton("⚙️ Панель создателя", callback_data='apanel')])
-    
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
     await update.message.reply_text(
-        f"🌊 **BLUE RUSSIA**\n\n"
-        f"👤 Твоя роль: **{role}**\n"
-        f"👑 Основатель бота: **{FOUNDER_NAME}**\n"
-        f"🤖 Создатель: @eaxpa\n\n"
-        f"Используй кнопки для навигации.",
+        f"🌊 **BLUE RUSSIA**\n\n👤 Твоя роль: **{role}**\n👑 Основатель бота: **{FOUNDER_NAME}**\n🤖 Создатель: @eaxpa",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -168,22 +135,13 @@ async def profile(update: Update, context: CallbackContext):
     warns = data['warns'].get(str(user_id), 0)
     muted = data['mutes'].get(str(user_id), False)
     banned = str(user_id) in data['banned']
-    
-    text = f"👤 **Профиль**\n\n"
-    text += f"🆔 ID: `{user_id}`\n"
-    text += f"🎖️ Роль: **{role}**\n"
-    text += f"⚠️ Варнов: {warns}\n"
-    text += f"🔇 Мут: {'Да' if muted else 'Нет'}\n"
-    text += f"🚫 Бан: {'Да' if banned else 'Нет'}\n"
-    
+    text = f"👤 **Профиль**\n\n🆔 ID: `{user_id}`\n🎖️ Роль: **{role}**\n⚠️ Варнов: {warns}\n🔇 Мут: {'Да' if muted else 'Нет'}\n🚫 Бан: {'Да' if banned else 'Нет'}"
     await query.edit_message_text(text, parse_mode='Markdown')
 
 async def roles_list(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    
-    text = "📋 **Все роли BLUE RUSSIA (от высшей к низшей):**\n\n"
-    
+    text = "📋 **Все роли:**\n\n"
     groups = {
         '👑 Высшее руководство': ['Основатель', 'Зам.основателя', 'Специальный администратор', 'Заместитель Специального Администратора'],
         '👑 Главные администраторы': ['Главный администратор', 'Основной заместитель ГА', 'Заместитель главного администратора (ЗГА)', 'Куратор администрации'],
@@ -193,32 +151,25 @@ async def roles_list(update: Update, context: CallbackContext):
         '📌 Доп. администрация': ['Контроль качества', 'Тестировщик'],
         '👤 Участники': ['Участник']
     }
-    
     for group, roles in groups.items():
         text += f"**{group}**\n"
         for role in roles:
             if role in ROLES:
-                emoji = "👑" if ROLES[role] <= 3 else "⚔️" if ROLES[role] <= 11 else "🛡️" if ROLES[role] <= 14 else "🔧" if ROLES[role] <= 19 else "📌"
-                text += f"  {emoji} {role}\n"
+                text += f"  • {role}\n"
         text += "\n"
-    
     text += f"👑 **Основатель бота:** {FOUNDER_NAME}"
-    
     await query.edit_message_text(text, parse_mode='Markdown')
 
 async def team_list(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    
     text = "👑 **Команда проекта BLUE RUSSIA**\n\n"
-    
     team = {}
     for uid, role in data['roles'].items():
         if role != 'Участник':
             if role not in team:
                 team[role] = []
             team[role].append(uid)
-    
     if not team:
         text += "Пока никого нет в команде."
     else:
@@ -228,16 +179,14 @@ async def team_list(update: Update, context: CallbackContext):
                 for uid in team[role]:
                     text += f"  • `{uid}`\n"
                 text += "\n"
-    
     await query.edit_message_text(text, parse_mode='Markdown')
 
 # ===== ПАНЕЛЬ СОЗДАТЕЛЯ =====
 async def apanel(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_creator(user_id):
-        await update.message.reply_text("❌ Только создатель бота может использовать эту команду!")
+        await update.message.reply_text("❌ Только создатель!")
         return
-    
     keyboard = [
         [InlineKeyboardButton("➕ Выдать роль", callback_data='give_role')],
         [InlineKeyboardButton("➖ Забрать роль", callback_data='remove_role')],
@@ -246,60 +195,30 @@ async def apanel(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🔄 Сброс данных", callback_data='reset_data')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        f"👑 **Панель создателя**\n\n"
-        f"👤 Создатель: @eaxpa\n"
-        f"👑 Основатель: **{FOUNDER_NAME}**\n\n"
-        f"Выбери действие:",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
+    await update.message.reply_text("👑 **Панель создателя**", reply_markup=reply_markup, parse_mode='Markdown')
 
 async def apanel_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    
     if not is_creator(user_id):
         await query.edit_message_text("❌ Только создатель!")
         return
-    
     action = query.data
-    
     if action == 'give_role':
-        roles_text = "\n".join([f"• {r}" for r in ROLE_NAMES])
-        await query.edit_message_text(
-            f"📝 **Выдать роль**\n\n"
-            f"Введите ID пользователя и роль через пробел.\n"
-            f"Доступные роли:\n{roles_text}\n\n"
-            f"Пример: `123456789 Администратор`"
-        )
+        await query.edit_message_text("Введите ID и роль через пробел")
         context.user_data['action'] = 'give_role'
-    
     elif action == 'remove_role':
-        await query.edit_message_text(
-            f"📝 **Забрать роль**\n\n"
-            f"Введите ID пользователя и роль через пробел.\n"
-            f"Пример: `123456789 Модератор`"
-        )
+        await query.edit_message_text("Введите ID и роль через пробел")
         context.user_data['action'] = 'remove_role'
-    
     elif action == 'stats':
-        text = "📊 **Статистика бота:**\n\n"
-        text += f"👥 Пользователей: {len(data['users'])}\n"
-        text += f"🎖️ Ролей выдано: {len(data['roles'])}\n"
-        text += f"⚠️ Варнов выдано: {sum(data['warns'].values())}\n"
-        text += f"🔇 Замучено: {sum(1 for v in data['mutes'].values() if v)}\n"
-        text += f"🚫 Забанено: {len(data['banned'])}\n"
-        await query.edit_message_text(text, parse_mode='Markdown')
-    
+        text = f"📊 Статистика:\n👥 Пользователей: {len(data['users'])}\n🎖️ Ролей: {len(data['roles'])}\n⚠️ Варнов: {sum(data['warns'].values())}"
+        await query.edit_message_text(text)
     elif action == 'users_list':
-        text = "📋 **Пользователи с ролями:**\n\n"
+        text = "📋 Пользователи:\n"
         for uid, role in data['roles'].items():
-            text += f"🆔 `{uid}` — **{role}**\n"
+            text += f"`{uid}` — {role}\n"
         await query.edit_message_text(text, parse_mode='Markdown')
-    
     elif action == 'reset_data':
         data['users'] = {}
         data['roles'] = {}
@@ -307,7 +226,7 @@ async def apanel_callback(update: Update, context: CallbackContext):
         data['mutes'] = {}
         data['banned'] = []
         save_data()
-        await query.edit_message_text("✅ Все данные сброшены!")
+        await query.edit_message_text("✅ Сброшено!")
 
 # ===== МОДЕРАЦИЯ =====
 async def ban(update: Update, context: CallbackContext):
@@ -315,86 +234,70 @@ async def ban(update: Update, context: CallbackContext):
     if not is_admin(user_id):
         await update.message.reply_text("❌ Недостаточно прав!")
         return
-    
     if len(context.args) < 1:
-        await update.message.reply_text("❗ Использование: /ban @username [причина]")
+        await update.message.reply_text("❗ /ban @user [причина]")
         return
-    
     try:
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+        await update.message.reply_text("❌ Не найден!")
         return
-    
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя забанить пользователя с высшей ролью!")
+        await update.message.reply_text("❌ Нельзя!")
         return
-    
-    reason = ' '.join(context.args[1:]) if len(context.args) > 1 else 'Не указана'
+    reason = ' '.join(context.args[1:]) or 'Не указана'
     data['banned'].append(str(target_id))
     save_data()
-    
-    await update.message.reply_text(f"✅ Пользователь {context.args[0]} забанен!\nПричина: {reason}")
+    await update.message.reply_text(f"✅ Забанен {context.args[0]}! Причина: {reason}")
 
 async def kick(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_moder(user_id):
         await update.message.reply_text("❌ Недостаточно прав!")
         return
-    
     if len(context.args) < 1:
-        await update.message.reply_text("❗ Использование: /kick @username [причина]")
+        await update.message.reply_text("❗ /kick @user [причина]")
         return
-    
     try:
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+        await update.message.reply_text("❌ Не найден!")
         return
-    
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя кикнуть пользователя с высшей ролью!")
+        await update.message.reply_text("❌ Нельзя!")
         return
-    
-    reason = ' '.join(context.args[1:]) if len(context.args) > 1 else 'Не указана'
+    reason = ' '.join(context.args[1:]) or 'Не указана'
     try:
         await context.bot.ban_chat_member(update.effective_chat.id, target_id)
         await context.bot.unban_chat_member(update.effective_chat.id, target_id)
-        await update.message.reply_text(f"✅ Пользователь {context.args[0]} кикнут!\nПричина: {reason}")
+        await update.message.reply_text(f"✅ Кикнут {context.args[0]}! Причина: {reason}")
     except:
-        await update.message.reply_text("❌ Ошибка при кике!")
+        await update.message.reply_text("❌ Ошибка!")
 
 async def mute(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_moder(user_id):
         await update.message.reply_text("❌ Недостаточно прав!")
         return
-    
     if len(context.args) < 1:
-        await update.message.reply_text("❗ Использование: /mute @username [время в минутах] [причина]")
+        await update.message.reply_text("❗ /mute @user [минуты] [причина]")
         return
-    
     try:
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+        await update.message.reply_text("❌ Не найден!")
         return
-    
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя замутить пользователя с высшей ролью!")
+        await update.message.reply_text("❌ Нельзя!")
         return
-    
     minutes = int(context.args[1]) if len(context.args) > 1 else 5
-    reason = ' '.join(context.args[2:]) if len(context.args) > 2 else 'Не указана'
-    
+    reason = ' '.join(context.args[2:]) or 'Не указана'
     data['mutes'][str(target_id)] = True
     save_data()
-    
-    await update.message.reply_text(f"✅ Пользователь {context.args[0]} замучен на {minutes} минут!\nПричина: {reason}")
-    
+    await update.message.reply_text(f"✅ Замучен {context.args[0]} на {minutes} мин! Причина: {reason}")
     await asyncio.sleep(minutes * 60)
     data['mutes'][str(target_id)] = False
     save_data()
@@ -404,91 +307,71 @@ async def unmute(update: Update, context: CallbackContext):
     if not is_moder(user_id):
         await update.message.reply_text("❌ Недостаточно прав!")
         return
-    
     if len(context.args) < 1:
-        await update.message.reply_text("❗ Использование: /unmute @username")
+        await update.message.reply_text("❗ /unmute @user")
         return
-    
     try:
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+        await update.message.reply_text("❌ Не найден!")
         return
-    
     data['mutes'][str(target_id)] = False
     save_data()
-    await update.message.reply_text(f"✅ Пользователь {context.args[0]} размучен!")
+    await update.message.reply_text(f"✅ Размучен {context.args[0]}!")
 
 async def warn(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_moder(user_id):
         await update.message.reply_text("❌ Недостаточно прав!")
         return
-    
     if len(context.args) < 1:
-        await update.message.reply_text("❗ Использование: /warn @username [причина]")
+        await update.message.reply_text("❗ /warn @user [причина]")
         return
-    
     try:
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+        await update.message.reply_text("❌ Не найден!")
         return
-    
-    reason = ' '.join(context.args[1:]) if len(context.args) > 1 else 'Не указана'
+    reason = ' '.join(context.args[1:]) or 'Не указана'
     data['warns'][str(target_id)] = data['warns'].get(str(target_id), 0) + 1
     save_data()
-    
-    await update.message.reply_text(
-        f"⚠️ Пользователь {context.args[0]} получил предупреждение!\n"
-        f"Причина: {reason}\n"
-        f"Всего варнов: {data['warns'][str(target_id)]}"
-    )
+    await update.message.reply_text(f"⚠️ Варн {context.args[0]}! Причина: {reason}\nВсего: {data['warns'][str(target_id)]}")
 
 async def unwarn(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_moder(user_id):
         await update.message.reply_text("❌ Недостаточно прав!")
         return
-    
     if len(context.args) < 1:
-        await update.message.reply_text("❗ Использование: /unwarn @username")
+        await update.message.reply_text("❗ /unwarn @user")
         return
-    
     try:
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+        await update.message.reply_text("❌ Не найден!")
         return
-    
     if data['warns'].get(str(target_id), 0) > 0:
         data['warns'][str(target_id)] -= 1
         save_data()
-        await update.message.reply_text(
-            f"✅ Снято предупреждение с {context.args[0]}!\n"
-            f"Осталось варнов: {data['warns'][str(target_id)]}"
-        )
+        await update.message.reply_text(f"✅ Снят варн с {context.args[0]}! Осталось: {data['warns'][str(target_id)]}")
     else:
-        await update.message.reply_text("❌ У пользователя нет варнов!")
+        await update.message.reply_text("❌ Нет варнов!")
 
-# ===== ОБРАБОТЧИК СООБЩЕНИЙ =====
+# ===== ОБРАБОТЧИКИ =====
 async def handle_message(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    
     if str(user_id) in data['banned']:
         await update.message.delete()
         return
-    
     if data['mutes'].get(str(user_id), False):
         await update.message.delete()
-        await update.message.reply_text("🔇 Вы в муте! Не пишите.")
+        await update.message.reply_text("🔇 Вы в муте!")
 
 async def handle_text(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    
     if context.user_data.get('action') == 'give_role':
         parts = update.message.text.split()
         if len(parts) == 2:
@@ -496,13 +379,10 @@ async def handle_text(update: Update, context: CallbackContext):
             if role in ROLES:
                 data['roles'][target_id] = role
                 save_data()
-                await update.message.reply_text(f"✅ Пользователю {target_id} выдана роль **{role}**!", parse_mode='Markdown')
+                await update.message.reply_text(f"✅ Выдана роль {role}!")
             else:
-                await update.message.reply_text(f"❌ Роль '{role}' не существует!")
-        else:
-            await update.message.reply_text("❌ Неверный формат! ID и роль через пробел.")
+                await update.message.reply_text("❌ Роль не найдена!")
         context.user_data['action'] = None
-    
     elif context.user_data.get('action') == 'remove_role':
         parts = update.message.text.split()
         if len(parts) == 2:
@@ -510,17 +390,24 @@ async def handle_text(update: Update, context: CallbackContext):
             if data['roles'].get(target_id) == role:
                 data['roles'][target_id] = 'Участник'
                 save_data()
-                await update.message.reply_text(f"✅ У пользователя {target_id} забрана роль **{role}**!", parse_mode='Markdown')
+                await update.message.reply_text(f"✅ Забрана роль {role}!")
             else:
-                await update.message.reply_text(f"❌ У пользователя нет роли {role}!")
-        else:
-            await update.message.reply_text("❌ Неверный формат! ID и роль через пробел.")
+                await update.message.reply_text("❌ Нет такой роли!")
         context.user_data['action'] = None
 
-# ===== ЗАПУСК =====
+# ===== ФЛАСК ДЛЯ RENDER =====
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "BLUE RUSSIA Bot is running!"
+
+def run_flask():
+    app_flask.run(host='0.0.0.0', port=10000)
+
+# ===== ТЕЛЕГРАМ БОТ =====
 app = Application.builder().token(TOKEN).build()
 
-# Команды
 app.add_handler(CommandHandler('start', start))
 app.add_handler(CommandHandler('apanel', apanel))
 app.add_handler(CommandHandler('ban', ban))
@@ -530,7 +417,6 @@ app.add_handler(CommandHandler('unmute', unmute))
 app.add_handler(CommandHandler('warn', warn))
 app.add_handler(CommandHandler('unwarn', unwarn))
 
-# Callback
 app.add_handler(CallbackQueryHandler(profile, pattern='profile'))
 app.add_handler(CallbackQueryHandler(roles_list, pattern='roles_list'))
 app.add_handler(CallbackQueryHandler(team_list, pattern='team_list'))
@@ -541,14 +427,18 @@ app.add_handler(CallbackQueryHandler(apanel_callback, pattern='stats'))
 app.add_handler(CallbackQueryHandler(apanel_callback, pattern='users_list'))
 app.add_handler(CallbackQueryHandler(apanel_callback, pattern='reset_data'))
 
-# Обработчики сообщений
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 app.add_handler(MessageHandler(filters.ALL, handle_message))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_chat_members))
 
-print("🤖 Бот BLUE RUSSIA запущен!")
-print(f"👑 Основатель: {FOUNDER_NAME}")
-print(f"🤖 Создатель: @eaxpa")
-print(f"📋 Всего ролей: {len(ROLES)}")
-
-app.run_polling()
+# ===== ЗАПУСК =====
+if __name__ == '__main__':
+    # Запускаем Flask в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+    
+    print("🤖 Бот BLUE RUSSIA запущен!")
+    print(f"👑 Основатель: {FOUNDER_NAME}")
+    print(f"🤖 Создатель: @eaxpa")
+    
+    app.run_polling()
