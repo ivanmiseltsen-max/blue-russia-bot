@@ -8,7 +8,7 @@ from flask import Flask
 import threading
 
 # ===== НАСТРОЙКИ (ЗАМЕНИ ТОКЕН!) =====
-TOKEN = '8968112083:AAGXiHHEWQNHW1UmQSTWAPB_L6vJQjmj_8o'
+TOKEN = '8968112083:AAF9UbvAvJ8sJs7CPeFTfetGXxadEO9SQVE'
 CREATOR_ID = 7743220894
 FOUNDER_NAME = 'Савелий'
 
