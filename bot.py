@@ -9,7 +9,7 @@ import threading
 import requests
 import time
 
-# ===== НАСТРОЙКИ (ЗАМЕНИ ТОКЕН!) =====
+# ===== НАСТРОЙКИ =====
 TOKEN = '8968112083:AAF9UbvAvJ8sJs7CPeFTfetGXxadEO9SQVE'
 CREATOR_ID = 7743220894
 FOUNDER_NAME = 'Савелий'
@@ -33,6 +33,7 @@ def load_data():
 def save_data():
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+    print("✅ Данные сохранены!")
 
 data = load_data()
 
@@ -89,9 +90,8 @@ async def handle_new_chat_members(update: Update, context: CallbackContext):
     for member in update.message.new_chat_members:
         if member.id == context.bot.id:
             await update.message.reply_text(
-                f"🌊 Привет! Я проект **BLUE RUSSIA**\n"
-                f"🤝 Рад с вами познакомиться!\n"
-                f"👑 Создатель: товарищь **{FOUNDER_NAME}**\n"
+                f"🌊 Привет! Я **BLUE RUSSIA**\n"
+                f"👑 Создатель: {FOUNDER_NAME}\n"
                 f"🤖 Разработчик: @eaxpa\n"
                 f"⚡ Используй /start"
             )
@@ -100,7 +100,6 @@ async def handle_new_chat_members(update: Update, context: CallbackContext):
         if str(user_id) not in data['roles']:
             data['roles'][str(user_id)] = 'Участник'
             save_data()
-        await update.message.reply_text(f"👋 Добро пожаловать, {member.full_name}!")
 
 # ===== СТАРТ =====
 async def start(update: Update, context: CallbackContext):
@@ -119,8 +118,7 @@ async def start(update: Update, context: CallbackContext):
     await update.message.reply_text(
         f"🌊 **BLUE RUSSIA**\n"
         f"👤 Твоя роль: **{role}**\n"
-        f"👑 Основатель: **{FOUNDER_NAME}**\n"
-        f"🤖 Создатель: @eaxpa",
+        f"👑 Основатель: {FOUNDER_NAME}",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='Markdown'
     )
@@ -150,12 +148,12 @@ async def roles_list(update: Update, context: CallbackContext):
     await query.answer()
     text = "📋 **Все роли:**\n\n"
     groups = {
-        '👑 Высшее руководство': ['Основатель', 'Зам.основателя', 'Специальный администратор', 'Заместитель Специального Администратора'],
-        '👑 Главные администраторы': ['Главный администратор', 'Основной заместитель ГА', 'Заместитель главного администратора (ЗГА)', 'Куратор администрации'],
-        '⚔️ Администраторы': ['ГС', 'Старший администратор', 'Заместитель ГС', 'Администратор'],
-        '🛡️ Модераторы': ['Старший модератор', 'Модератор', 'Младший модератор'],
-        '🔧 Тех.специалисты': ['Главный Тех.Специалист', 'Заместитель главного Технического Специалиста', 'Главный куратор Тех.Специалистов', 'Куратор Тех.Специалистов', 'Технический специалист'],
-        '📌 Доп. администрация': ['Контроль качества', 'Тестировщик'],
+        '👑 Высшее': ['Основатель', 'Зам.основателя', 'Специальный администратор', 'Заместитель Специального Администратора'],
+        '👑 Главные': ['Главный администратор', 'Основной заместитель ГА', 'ЗГА', 'Куратор администрации'],
+        '⚔️ Админы': ['ГС', 'Старший администратор', 'Заместитель ГС', 'Администратор'],
+        '🛡️ Модеры': ['Старший модератор', 'Модератор', 'Младший модератор'],
+        '🔧 Тех.спец': ['Главный Тех.Специалист', 'Зам. Технического Специалиста', 'Главный куратор ТС', 'Куратор ТС', 'Технический специалист'],
+        '📌 Доп': ['Контроль качества', 'Тестировщик'],
         '👤 Участники': ['Участник']
     }
     for group, roles in groups.items():
@@ -204,7 +202,7 @@ async def setrole(update: Update, context: CallbackContext):
         return
     data['roles'][str(target_id)] = role_name
     save_data()
-    await update.message.reply_text(f"✅ Пользователю `{target_id}` выдана роль **{role_name}**!", parse_mode='Markdown')
+    await update.message.reply_text(f"✅ Выдана роль **{role_name}**!", parse_mode='Markdown')
 
 # ===== ЗАБОР РОЛИ =====
 async def removerole(update: Update, context: CallbackContext):
@@ -220,9 +218,9 @@ async def removerole(update: Update, context: CallbackContext):
     if data['roles'].get(str(target_id)) == role_name:
         data['roles'][str(target_id)] = 'Участник'
         save_data()
-        await update.message.reply_text(f"✅ У `{target_id}` забрана роль **{role_name}**!", parse_mode='Markdown')
+        await update.message.reply_text(f"✅ Забрана роль **{role_name}**!", parse_mode='Markdown')
     else:
-        await update.message.reply_text(f"❌ У пользователя нет роли {role_name}!")
+        await update.message.reply_text(f"❌ Нет роли {role_name}!")
 
 # ===== КИК =====
 async def kick(update: Update, context: CallbackContext):
@@ -237,11 +235,11 @@ async def kick(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
         target_name = target.user.username or target.user.first_name
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {str(e)}\nУбедись, что бот админ в группе!")
         return
     if target_id == user_id or target_id == CREATOR_ID or not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя кикнуть этого пользователя!")
+        await update.message.reply_text("❌ Нельзя!")
         return
     reason = ' '.join(context.args[1:]) or 'Не указана'
     try:
@@ -249,7 +247,7 @@ async def kick(update: Update, context: CallbackContext):
         await context.bot.unban_chat_member(update.effective_chat.id, target_id)
         await update.message.reply_text(f"✅ @{target_name} кикнут! Причина: {reason}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+        await update.message.reply_text(f"❌ Ошибка: {str(e)}\nУбедись, что бот админ!")
 
 # ===== БАН =====
 async def ban(update: Update, context: CallbackContext):
@@ -268,7 +266,7 @@ async def ban(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ Пользователь не найден!")
         return
     if target_id == user_id or target_id == CREATOR_ID or not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя забанить!")
+        await update.message.reply_text("❌ Нельзя!")
         return
     reason = ' '.join(context.args[1:]) or 'Не указана'
     try:
@@ -296,7 +294,7 @@ async def mute(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ Пользователь не найден!")
         return
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя замутить!")
+        await update.message.reply_text("❌ Нельзя!")
         return
     minutes = int(context.args[1]) if len(context.args) > 1 else 5
     reason = ' '.join(context.args[2:]) or 'Не указана'
@@ -328,7 +326,7 @@ async def unmute(update: Update, context: CallbackContext):
         save_data()
         await update.message.reply_text(f"✅ @{target_name} размучен!")
     else:
-        await update.message.reply_text("❌ Пользователь не в муте!")
+        await update.message.reply_text("❌ Не в муте!")
 
 # ===== ВАРН =====
 async def warn(update: Update, context: CallbackContext):
@@ -374,7 +372,7 @@ async def unwarn(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ Нет варнов!")
 
-# ===== АДМИНКА =====
+# ===== ПАНЕЛЬ СОЗДАТЕЛЯ =====
 async def apanel(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_creator(user_id):
@@ -428,7 +426,7 @@ async def handle_message(update: Update, context: CallbackContext):
         await update.message.delete()
         await update.message.reply_text("🔇 Вы в муте!")
 
-# ===== ФЛАСК ДЛЯ ПИНГА (RENDER НЕ ЗАСЫПАЕТ) =====
+# ===== ФЛАСК =====
 app_flask = Flask(__name__)
 
 @app_flask.route('/')
@@ -441,6 +439,15 @@ def ping():
 
 def run_flask():
     app_flask.run(host='0.0.0.0', port=10000)
+
+# ===== ПИНГ-СИСТЕМА =====
+def keep_alive():
+    while True:
+        try:
+            requests.get('https://blue-russia-bot.onrender.com/ping')
+        except:
+            pass
+        time.sleep(300)
 
 # ===== ТЕЛЕГРАМ БОТ =====
 app = Application.builder().token(TOKEN).build()
@@ -467,22 +474,11 @@ app.add_handler(CallbackQueryHandler(apanel_callback, pattern='reset_data'))
 app.add_handler(MessageHandler(filters.ALL, handle_message))
 app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_chat_members))
 
-# ===== ПИНГ-СИСТЕМА (ЧТОБЫ НЕ ЗАСЫПАЛ) =====
-def keep_alive():
-    while True:
-        try:
-            requests.get('https://blue-russia-bot.onrender.com/ping')
-        except:
-            pass
-        time.sleep(300)  # 5 минут
-
 # ===== ЗАПУСК =====
 if __name__ == '__main__':
-    # Запускаем Flask
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
     
-    # Запускаем пинг-систему
     ping_thread = threading.Thread(target=keep_alive)
     ping_thread.start()
     
@@ -490,6 +486,6 @@ if __name__ == '__main__':
     print(f"👑 Основатель: {FOUNDER_NAME}")
     print("✅ Данные сохраняются в data.json")
     print("✅ Команды: /kick, /ban, /mute, /unmute, /warn, /unwarn")
-    print("✅ Пинг-система активна (бот не засыпает)")
+    print("✅ Пинг-система активна")
     
     app.run_polling()
