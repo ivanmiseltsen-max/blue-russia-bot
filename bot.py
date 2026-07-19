@@ -194,7 +194,6 @@ async def setrole(update: Update, context: CallbackContext):
     if not is_creator(user_id):
         await update.message.reply_text("❌ Только создатель может выдавать роли!")
         return
-
     args = context.args
     if len(args) < 2:
         await update.message.reply_text(
@@ -204,20 +203,16 @@ async def setrole(update: Update, context: CallbackContext):
             "Доступные роли:\n" + "\n".join(ROLE_NAMES)
         )
         return
-
     target_id = args[0]
     role_name = ' '.join(args[1:])
-
     if role_name not in ROLES:
         await update.message.reply_text(
             f"❌ Роль '{role_name}' не существует!\n"
             "Доступные роли:\n" + "\n".join(ROLE_NAMES)
         )
         return
-
     data['roles'][str(target_id)] = role_name
     save_data()
-
     await update.message.reply_text(
         f"✅ Пользователю `{target_id}` выдана роль **{role_name}**!",
         parse_mode='Markdown'
@@ -229,7 +224,6 @@ async def removerole(update: Update, context: CallbackContext):
     if not is_creator(user_id):
         await update.message.reply_text("❌ Только создатель может забирать роли!")
         return
-
     args = context.args
     if len(args) < 2:
         await update.message.reply_text(
@@ -238,10 +232,8 @@ async def removerole(update: Update, context: CallbackContext):
             "Пример: `/removerole 7743220894 Администратор`"
         )
         return
-
     target_id = args[0]
     role_name = ' '.join(args[1:])
-
     if data['roles'].get(str(target_id)) == role_name:
         data['roles'][str(target_id)] = 'Участник'
         save_data()
@@ -251,6 +243,187 @@ async def removerole(update: Update, context: CallbackContext):
         )
     else:
         await update.message.reply_text(f"❌ У пользователя нет роли {role_name}!")
+
+# ===== КОМАНДА /kick =====
+async def kick(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if not is_moder(user_id):
+        await update.message.reply_text("❌ У тебя нет прав на кик!")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("❗ Использование: /kick @username [причина]")
+        return
+    try:
+        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
+        target_id = target.user.id
+        target_name = target.user.username or target.user.first_name
+    except:
+        await update.message.reply_text("❌ Пользователь не найден в этом чате!")
+        return
+    if target_id == user_id:
+        await update.message.reply_text("❌ Нельзя кикнуть самого себя!")
+        return
+    if target_id == CREATOR_ID:
+        await update.message.reply_text("❌ Нельзя кикнуть создателя бота!")
+        return
+    if not can_manage(user_id, target_id):
+        await update.message.reply_text("❌ Нельзя кикнуть пользователя с высшей или равной ролью!")
+        return
+    reason = ' '.join(context.args[1:]) or 'Не указана'
+    try:
+        await context.bot.ban_chat_member(update.effective_chat.id, target_id)
+        await context.bot.unban_chat_member(update.effective_chat.id, target_id)
+        await update.message.reply_text(
+            f"✅ Пользователь @{target_name} кикнут!\n"
+            f"👤 Кикнул: {update.effective_user.first_name}\n"
+            f"📝 Причина: {reason}"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при кике: {str(e)}")
+
+# ===== КОМАНДА /ban =====
+async def ban(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ Только администраторы могут банить!")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("❗ Использование: /ban @username [причина]")
+        return
+    try:
+        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
+        target_id = target.user.id
+        target_name = target.user.username or target.user.first_name
+    except:
+        await update.message.reply_text("❌ Пользователь не найден!")
+        return
+    if target_id == user_id:
+        await update.message.reply_text("❌ Нельзя забанить себя!")
+        return
+    if target_id == CREATOR_ID:
+        await update.message.reply_text("❌ Нельзя забанить создателя бота!")
+        return
+    if not can_manage(user_id, target_id):
+        await update.message.reply_text("❌ Нельзя забанить пользователя с высшей ролью!")
+        return
+    reason = ' '.join(context.args[1:]) or 'Не указана'
+    try:
+        await context.bot.ban_chat_member(update.effective_chat.id, target_id)
+        data['banned'].append(str(target_id))
+        save_data()
+        await update.message.reply_text(
+            f"✅ Пользователь @{target_name} забанен навсегда!\n"
+            f"👤 Забанил: {update.effective_user.first_name}\n"
+            f"📝 Причина: {reason}"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при бане: {str(e)}")
+
+# ===== КОМАНДА /mute =====
+async def mute(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if not is_moder(user_id):
+        await update.message.reply_text("❌ Недостаточно прав!")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("❗ /mute @user [минуты] [причина]")
+        return
+    try:
+        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
+        target_id = target.user.id
+        target_name = target.user.username or target.user.first_name
+    except:
+        await update.message.reply_text("❌ Пользователь не найден!")
+        return
+    if not can_manage(user_id, target_id):
+        await update.message.reply_text("❌ Нельзя замутить пользователя с высшей ролью!")
+        return
+    minutes = int(context.args[1]) if len(context.args) > 1 else 5
+    reason = ' '.join(context.args[2:]) or 'Не указана'
+    data['mutes'][str(target_id)] = True
+    save_data()
+    await update.message.reply_text(
+        f"✅ Пользователь @{target_name} замучен на {minutes} минут!\n"
+        f"👤 Замутил: {update.effective_user.first_name}\n"
+        f"📝 Причина: {reason}"
+    )
+    await asyncio.sleep(minutes * 60)
+    data['mutes'][str(target_id)] = False
+    save_data()
+
+# ===== КОМАНДА /unmute =====
+async def unmute(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if not is_moder(user_id):
+        await update.message.reply_text("❌ Недостаточно прав!")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("❗ /unmute @user")
+        return
+    try:
+        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
+        target_id = target.user.id
+        target_name = target.user.username or target.user.first_name
+    except:
+        await update.message.reply_text("❌ Пользователь не найден!")
+        return
+    if str(target_id) in data['mutes']:
+        data['mutes'][str(target_id)] = False
+        save_data()
+        await update.message.reply_text(f"✅ Пользователь @{target_name} размучен!")
+    else:
+        await update.message.reply_text("❌ Пользователь не в муте!")
+
+# ===== КОМАНДА /warn =====
+async def warn(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if not is_moder(user_id):
+        await update.message.reply_text("❌ Недостаточно прав!")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("❗ /warn @user [причина]")
+        return
+    try:
+        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
+        target_id = target.user.id
+        target_name = target.user.username or target.user.first_name
+    except:
+        await update.message.reply_text("❌ Пользователь не найден!")
+        return
+    reason = ' '.join(context.args[1:]) or 'Не указана'
+    data['warns'][str(target_id)] = data['warns'].get(str(target_id), 0) + 1
+    save_data()
+    await update.message.reply_text(
+        f"⚠️ Пользователь @{target_name} получил предупреждение!\n"
+        f"📝 Причина: {reason}\n"
+        f"🔢 Всего варнов: {data['warns'][str(target_id)]}"
+    )
+
+# ===== КОМАНДА /unwarn =====
+async def unwarn(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    if not is_moder(user_id):
+        await update.message.reply_text("❌ Недостаточно прав!")
+        return
+    if len(context.args) < 1:
+        await update.message.reply_text("❗ /unwarn @user")
+        return
+    try:
+        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
+        target_id = target.user.id
+        target_name = target.user.username or target.user.first_name
+    except:
+        await update.message.reply_text("❌ Пользователь не найден!")
+        return
+    if data['warns'].get(str(target_id), 0) > 0:
+        data['warns'][str(target_id)] -= 1
+        save_data()
+        await update.message.reply_text(
+            f"✅ Снято предупреждение с @{target_name}!\n"
+            f"Осталось варнов: {data['warns'][str(target_id)]}"
+        )
+    else:
+        await update.message.reply_text("❌ У пользователя нет предупреждений!")
 
 # ===== ПАНЕЛЬ СОЗДАТЕЛЯ =====
 async def apanel(update: Update, context: CallbackContext):
@@ -298,138 +471,6 @@ async def apanel_callback(update: Update, context: CallbackContext):
         save_data()
         await query.edit_message_text("✅ Все данные сброшены!")
 
-# ===== МОДЕРАЦИЯ =====
-async def ban(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_admin(user_id):
-        await update.message.reply_text("❌ Недостаточно прав!")
-        return
-    if len(context.args) < 1:
-        await update.message.reply_text("❗ /ban @user [причина]")
-        return
-    try:
-        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
-        target_id = target.user.id
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя забанить пользователя с высшей ролью!")
-        return
-    reason = ' '.join(context.args[1:]) or 'Не указана'
-    data['banned'].append(str(target_id))
-    save_data()
-    await update.message.reply_text(f"✅ Забанен {context.args[0]}!\nПричина: {reason}")
-
-async def kick(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_moder(user_id):
-        await update.message.reply_text("❌ Недостаточно прав!")
-        return
-    if len(context.args) < 1:
-        await update.message.reply_text("❗ /kick @user [причина]")
-        return
-    try:
-        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
-        target_id = target.user.id
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя кикнуть пользователя с высшей ролью!")
-        return
-    reason = ' '.join(context.args[1:]) or 'Не указана'
-    try:
-        await context.bot.ban_chat_member(update.effective_chat.id, target_id)
-        await context.bot.unban_chat_member(update.effective_chat.id, target_id)
-        await update.message.reply_text(f"✅ Кикнут {context.args[0]}!\nПричина: {reason}")
-    except:
-        await update.message.reply_text("❌ Ошибка при кике!")
-
-async def mute(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_moder(user_id):
-        await update.message.reply_text("❌ Недостаточно прав!")
-        return
-    if len(context.args) < 1:
-        await update.message.reply_text("❗ /mute @user [минуты] [причина]")
-        return
-    try:
-        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
-        target_id = target.user.id
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя замутить пользователя с высшей ролью!")
-        return
-    minutes = int(context.args[1]) if len(context.args) > 1 else 5
-    reason = ' '.join(context.args[2:]) or 'Не указана'
-    data['mutes'][str(target_id)] = True
-    save_data()
-    await update.message.reply_text(f"✅ Замучен {context.args[0]} на {minutes} мин!\nПричина: {reason}")
-    await asyncio.sleep(minutes * 60)
-    data['mutes'][str(target_id)] = False
-    save_data()
-
-async def unmute(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_moder(user_id):
-        await update.message.reply_text("❌ Недостаточно прав!")
-        return
-    if len(context.args) < 1:
-        await update.message.reply_text("❗ /unmute @user")
-        return
-    try:
-        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
-        target_id = target.user.id
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    data['mutes'][str(target_id)] = False
-    save_data()
-    await update.message.reply_text(f"✅ Размучен {context.args[0]}!")
-
-async def warn(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_moder(user_id):
-        await update.message.reply_text("❌ Недостаточно прав!")
-        return
-    if len(context.args) < 1:
-        await update.message.reply_text("❗ /warn @user [причина]")
-        return
-    try:
-        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
-        target_id = target.user.id
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    reason = ' '.join(context.args[1:]) or 'Не указана'
-    data['warns'][str(target_id)] = data['warns'].get(str(target_id), 0) + 1
-    save_data()
-    await update.message.reply_text(f"⚠️ Варн {context.args[0]}!\nПричина: {reason}\nВсего варнов: {data['warns'][str(target_id)]}")
-
-async def unwarn(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    if not is_moder(user_id):
-        await update.message.reply_text("❌ Недостаточно прав!")
-        return
-    if len(context.args) < 1:
-        await update.message.reply_text("❗ /unwarn @user")
-        return
-    try:
-        target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
-        target_id = target.user.id
-    except:
-        await update.message.reply_text("❌ Пользователь не найден!")
-        return
-    if data['warns'].get(str(target_id), 0) > 0:
-        data['warns'][str(target_id)] -= 1
-        save_data()
-        await update.message.reply_text(f"✅ Снят варн с {context.args[0]}!\nОсталось варнов: {data['warns'][str(target_id)]}")
-    else:
-        await update.message.reply_text("❌ У пользователя нет варнов!")
-
 # ===== ФЛАСК ДЛЯ RENDER =====
 app_flask = Flask(__name__)
 
@@ -447,8 +488,8 @@ app.add_handler(CommandHandler('start', start))
 app.add_handler(CommandHandler('apanel', apanel))
 app.add_handler(CommandHandler('setrole', setrole))
 app.add_handler(CommandHandler('removerole', removerole))
-app.add_handler(CommandHandler('ban', ban))
 app.add_handler(CommandHandler('kick', kick))
+app.add_handler(CommandHandler('ban', ban))
 app.add_handler(CommandHandler('mute', mute))
 app.add_handler(CommandHandler('unmute', unmute))
 app.add_handler(CommandHandler('warn', warn))
