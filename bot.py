@@ -9,7 +9,7 @@ import threading
 
 # ===== НАСТРОЙКИ =====
 TOKEN = '8968112083:AAGXiHHEWQNHW1UmQSTWAPB_L6vJQjmj_8o'
-CREATOR_ID = 7743220894  # ТВОЙ ID
+CREATOR_ID = 7743220894
 FOUNDER_NAME = 'Савелий'
 
 logging.basicConfig(level=logging.INFO)
@@ -37,7 +37,7 @@ def save_data():
 
 data = load_data()
 
-# ===== ВСЕ РОЛИ =====
+# ===== РОЛИ =====
 ROLES = {
     'Основатель': 0,
     'Зам.основателя': 1,
@@ -140,14 +140,7 @@ async def profile(update: Update, context: CallbackContext):
     warns = data['warns'].get(str(user_id), 0)
     muted = data['mutes'].get(str(user_id), False)
     banned = str(user_id) in data['banned']
-    text = (
-        f"👤 **Профиль**\n\n"
-        f"🆔 ID: `{user_id}`\n"
-        f"🎖️ Роль: **{role}**\n"
-        f"⚠️ Варнов: {warns}\n"
-        f"🔇 Мут: {'Да' if muted else 'Нет'}\n"
-        f"🚫 Бан: {'Да' if banned else 'Нет'}"
-    )
+    text = f"👤 **Профиль**\n\n🆔 ID: `{user_id}`\n🎖️ Роль: **{role}**\n⚠️ Варнов: {warns}\n🔇 Мут: {'Да' if muted else 'Нет'}\n🚫 Бан: {'Да' if banned else 'Нет'}"
     await query.edit_message_text(text, parse_mode='Markdown')
 
 # ===== СПИСОК РОЛЕЙ =====
@@ -210,8 +203,7 @@ async def apanel(update: Update, context: CallbackContext):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "👑 **Панель создателя**\n\n"
-        "Выбери действие:",
+        "👑 **Панель создателя**\n\nВыбери действие:",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -226,28 +218,21 @@ async def apanel_callback(update: Update, context: CallbackContext):
         return
     action = query.data
     if action == 'give_role':
+        context.user_data['action'] = 'give_role'
         await query.edit_message_text(
             "📝 **Выдать роль**\n\n"
             "Введите ID пользователя и роль через пробел.\n"
             "Пример: `7743220894 Администратор`"
         )
-        context.user_data['action'] = 'give_role'
     elif action == 'remove_role':
+        context.user_data['action'] = 'remove_role'
         await query.edit_message_text(
             "📝 **Забрать роль**\n\n"
             "Введите ID пользователя и роль через пробел.\n"
             "Пример: `7743220894 Администратор`"
         )
-        context.user_data['action'] = 'remove_role'
     elif action == 'stats':
-        text = (
-            f"📊 **Статистика:**\n\n"
-            f"👥 Пользователей: {len(data['users'])}\n"
-            f"🎖️ Ролей выдано: {len(data['roles'])}\n"
-            f"⚠️ Варнов выдано: {sum(data['warns'].values())}\n"
-            f"🔇 В муте: {sum(1 for v in data['mutes'].values() if v)}\n"
-            f"🚫 Забанено: {len(data['banned'])}"
-        )
+        text = f"📊 **Статистика:**\n\n👥 Пользователей: {len(data['users'])}\n🎖️ Ролей выдано: {len(data['roles'])}\n⚠️ Варнов выдано: {sum(data['warns'].values())}\n🔇 В муте: {sum(1 for v in data['mutes'].values() if v)}\n🚫 Забанено: {len(data['banned'])}"
         await query.edit_message_text(text, parse_mode='Markdown')
     elif action == 'users_list':
         text = "📋 **Пользователи с ролями:**\n\n"
@@ -372,11 +357,7 @@ async def warn(update: Update, context: CallbackContext):
     reason = ' '.join(context.args[1:]) or 'Не указана'
     data['warns'][str(target_id)] = data['warns'].get(str(target_id), 0) + 1
     save_data()
-    await update.message.reply_text(
-        f"⚠️ Варн {context.args[0]}!\n"
-        f"Причина: {reason}\n"
-        f"Всего варнов: {data['warns'][str(target_id)]}"
-    )
+    await update.message.reply_text(f"⚠️ Варн {context.args[0]}!\nПричина: {reason}\nВсего варнов: {data['warns'][str(target_id)]}")
 
 async def unwarn(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -395,10 +376,7 @@ async def unwarn(update: Update, context: CallbackContext):
     if data['warns'].get(str(target_id), 0) > 0:
         data['warns'][str(target_id)] -= 1
         save_data()
-        await update.message.reply_text(
-            f"✅ Снят варн с {context.args[0]}!\n"
-            f"Осталось варнов: {data['warns'][str(target_id)]}"
-        )
+        await update.message.reply_text(f"✅ Снят варн с {context.args[0]}!\nОсталось варнов: {data['warns'][str(target_id)]}")
     else:
         await update.message.reply_text("❌ У пользователя нет варнов!")
 
@@ -412,40 +390,55 @@ async def handle_message(update: Update, context: CallbackContext):
         await update.message.delete()
         await update.message.reply_text("🔇 Вы в муте! Не пишите.")
 
-# ===== ОБРАБОТЧИК ТЕКСТА ДЛЯ ПАНЕЛИ =====
+# ===== ОБРАБОТЧИК ТЕКСТА (ГЛАВНЫЙ) =====
 async def handle_text(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if not is_creator(user_id):
         return
+    
     action = context.user_data.get('action')
+    if not action:
+        return
+    
+    parts = update.message.text.strip().split()
+    if len(parts) != 2:
+        await update.message.reply_text(
+            "❌ Неверный формат!\n"
+            "Нужно: `ID Роль`\n"
+            "Пример: `7743220894 Администратор`"
+        )
+        return
+    
+    target_id, role_name = parts
+    
     if action == 'give_role':
-        parts = update.message.text.split()
-        if len(parts) == 2:
-            target_id, role = parts
-            if role in ROLES:
-                data['roles'][str(target_id)] = role
-                save_data()
-                await update.message.reply_text(f"✅ Пользователю `{target_id}` выдана роль **{role}**!", parse_mode='Markdown')
-            else:
-                await update.message.reply_text(f"❌ Роль '{role}' не существует!\nДоступные роли:\n" + "\n".join(ROLE_NAMES))
-        else:
-            await update.message.reply_text("❌ Неверный формат!\nНужно: `ID Роль`\nПример: `7743220894 Администратор`")
-        context.user_data['action'] = None
+        if role_name not in ROLES:
+            await update.message.reply_text(
+                f"❌ Роль '{role_name}' не существует!\n"
+                "Доступные роли:\n" + "\n".join(ROLE_NAMES)
+            )
+            return
+        data['roles'][str(target_id)] = role_name
+        save_data()
+        await update.message.reply_text(
+            f"✅ Пользователю `{target_id}` выдана роль **{role_name}**!",
+            parse_mode='Markdown'
+        )
+    
     elif action == 'remove_role':
-        parts = update.message.text.split()
-        if len(parts) == 2:
-            target_id, role = parts
-            if data['roles'].get(str(target_id)) == role:
-                data['roles'][str(target_id)] = 'Участник'
-                save_data()
-                await update.message.reply_text(f"✅ У пользователя `{target_id}` забрана роль **{role}**!", parse_mode='Markdown')
-            else:
-                await update.message.reply_text(f"❌ У пользователя нет роли {role}!")
+        if data['roles'].get(str(target_id)) == role_name:
+            data['roles'][str(target_id)] = 'Участник'
+            save_data()
+            await update.message.reply_text(
+                f"✅ У пользователя `{target_id}` забрана роль **{role_name}**!",
+                parse_mode='Markdown'
+            )
         else:
-            await update.message.reply_text("❌ Неверный формат!\nНужно: `ID Роль`\nПример: `7743220894 Администратор`")
-        context.user_data['action'] = None
+            await update.message.reply_text(f"❌ У пользователя нет роли {role_name}!")
+    
+    context.user_data['action'] = None
 
-# ===== ФЛАСК ДЛЯ RENDER =====
+# ===== ФЛАСК =====
 app_flask = Flask(__name__)
 
 @app_flask.route('/')
