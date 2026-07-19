@@ -8,8 +8,8 @@ from flask import Flask
 import threading
 
 # ===== НАСТРОЙКИ =====
-TOKEN = '8968112083:AAGXiHHEWQNHW1UmQSTWAPB_L6vJQjmj_8o' # ← СЮДА ВСТАВЬ НОВЫЙ ТОКЕН
-CREATOR_ID = 7743220894
+TOKEN = '8968112083:AAGXiHHEWQNHW1UmQSTWAPB_L6vJQjmj_8o'
+CREATOR_ID = 7743220894  # ТВОЙ ID
 FOUNDER_NAME = 'Савелий'
 
 logging.basicConfig(level=logging.INFO)
@@ -89,7 +89,7 @@ def can_manage(user_id, target_id):
     target_level = get_role_level(target_id)
     return user_level < target_level
 
-# ===== КОМАНДЫ БОТА =====
+# ===== ПРИВЕТСТВИЕ =====
 async def handle_new_chat_members(update: Update, context: CallbackContext):
     for member in update.message.new_chat_members:
         if member.id == context.bot.id:
@@ -107,6 +107,7 @@ async def handle_new_chat_members(update: Update, context: CallbackContext):
             save_data()
         await update.message.reply_text(f"👋 Добро пожаловать, {member.full_name}!\n🌊 Ты в проекте BLUE RUSSIA")
 
+# ===== СТАРТ =====
 async def start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if str(user_id) not in data['roles']:
@@ -122,11 +123,15 @@ async def start(update: Update, context: CallbackContext):
         keyboard.append([InlineKeyboardButton("⚙️ Панель создателя", callback_data='apanel')])
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        f"🌊 **BLUE RUSSIA**\n\n👤 Твоя роль: **{role}**\n👑 Основатель бота: **{FOUNDER_NAME}**\n🤖 Создатель: @eaxpa",
+        f"🌊 **BLUE RUSSIA**\n\n"
+        f"👤 Твоя роль: **{role}**\n"
+        f"👑 Основатель бота: **{FOUNDER_NAME}**\n"
+        f"🤖 Создатель: @eaxpa",
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
+# ===== ПРОФИЛЬ =====
 async def profile(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
@@ -135,13 +140,21 @@ async def profile(update: Update, context: CallbackContext):
     warns = data['warns'].get(str(user_id), 0)
     muted = data['mutes'].get(str(user_id), False)
     banned = str(user_id) in data['banned']
-    text = f"👤 **Профиль**\n\n🆔 ID: `{user_id}`\n🎖️ Роль: **{role}**\n⚠️ Варнов: {warns}\n🔇 Мут: {'Да' if muted else 'Нет'}\n🚫 Бан: {'Да' if banned else 'Нет'}"
+    text = (
+        f"👤 **Профиль**\n\n"
+        f"🆔 ID: `{user_id}`\n"
+        f"🎖️ Роль: **{role}**\n"
+        f"⚠️ Варнов: {warns}\n"
+        f"🔇 Мут: {'Да' if muted else 'Нет'}\n"
+        f"🚫 Бан: {'Да' if banned else 'Нет'}"
+    )
     await query.edit_message_text(text, parse_mode='Markdown')
 
+# ===== СПИСОК РОЛЕЙ =====
 async def roles_list(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    text = "📋 **Все роли:**\n\n"
+    text = "📋 **Все роли (от высшей к низшей):**\n\n"
     groups = {
         '👑 Высшее руководство': ['Основатель', 'Зам.основателя', 'Специальный администратор', 'Заместитель Специального Администратора'],
         '👑 Главные администраторы': ['Главный администратор', 'Основной заместитель ГА', 'Заместитель главного администратора (ЗГА)', 'Куратор администрации'],
@@ -160,6 +173,7 @@ async def roles_list(update: Update, context: CallbackContext):
     text += f"👑 **Основатель бота:** {FOUNDER_NAME}"
     await query.edit_message_text(text, parse_mode='Markdown')
 
+# ===== КОМАНДА ПРОЕКТА =====
 async def team_list(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
@@ -195,8 +209,14 @@ async def apanel(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🔄 Сброс данных", callback_data='reset_data')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("👑 **Панель создателя**", reply_markup=reply_markup, parse_mode='Markdown')
+    await update.message.reply_text(
+        "👑 **Панель создателя**\n\n"
+        "Выбери действие:",
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
+# ===== КОЛБЭКИ ПАНЕЛИ =====
 async def apanel_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
@@ -206,18 +226,33 @@ async def apanel_callback(update: Update, context: CallbackContext):
         return
     action = query.data
     if action == 'give_role':
-        await query.edit_message_text("Введите ID и роль через пробел")
+        await query.edit_message_text(
+            "📝 **Выдать роль**\n\n"
+            "Введите ID пользователя и роль через пробел.\n"
+            "Пример: `7743220894 Администратор`"
+        )
         context.user_data['action'] = 'give_role'
     elif action == 'remove_role':
-        await query.edit_message_text("Введите ID и роль через пробел")
+        await query.edit_message_text(
+            "📝 **Забрать роль**\n\n"
+            "Введите ID пользователя и роль через пробел.\n"
+            "Пример: `7743220894 Администратор`"
+        )
         context.user_data['action'] = 'remove_role'
     elif action == 'stats':
-        text = f"📊 Статистика:\n👥 Пользователей: {len(data['users'])}\n🎖️ Ролей: {len(data['roles'])}\n⚠️ Варнов: {sum(data['warns'].values())}"
-        await query.edit_message_text(text)
+        text = (
+            f"📊 **Статистика:**\n\n"
+            f"👥 Пользователей: {len(data['users'])}\n"
+            f"🎖️ Ролей выдано: {len(data['roles'])}\n"
+            f"⚠️ Варнов выдано: {sum(data['warns'].values())}\n"
+            f"🔇 В муте: {sum(1 for v in data['mutes'].values() if v)}\n"
+            f"🚫 Забанено: {len(data['banned'])}"
+        )
+        await query.edit_message_text(text, parse_mode='Markdown')
     elif action == 'users_list':
-        text = "📋 Пользователи:\n"
+        text = "📋 **Пользователи с ролями:**\n\n"
         for uid, role in data['roles'].items():
-            text += f"`{uid}` — {role}\n"
+            text += f"🆔 `{uid}` — **{role}**\n"
         await query.edit_message_text(text, parse_mode='Markdown')
     elif action == 'reset_data':
         data['users'] = {}
@@ -226,7 +261,7 @@ async def apanel_callback(update: Update, context: CallbackContext):
         data['mutes'] = {}
         data['banned'] = []
         save_data()
-        await query.edit_message_text("✅ Сброшено!")
+        await query.edit_message_text("✅ Все данные сброшены!")
 
 # ===== МОДЕРАЦИЯ =====
 async def ban(update: Update, context: CallbackContext):
@@ -241,15 +276,15 @@ async def ban(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Не найден!")
+        await update.message.reply_text("❌ Пользователь не найден!")
         return
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя!")
+        await update.message.reply_text("❌ Нельзя забанить пользователя с высшей ролью!")
         return
     reason = ' '.join(context.args[1:]) or 'Не указана'
     data['banned'].append(str(target_id))
     save_data()
-    await update.message.reply_text(f"✅ Забанен {context.args[0]}! Причина: {reason}")
+    await update.message.reply_text(f"✅ Забанен {context.args[0]}!\nПричина: {reason}")
 
 async def kick(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -263,18 +298,18 @@ async def kick(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Не найден!")
+        await update.message.reply_text("❌ Пользователь не найден!")
         return
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя!")
+        await update.message.reply_text("❌ Нельзя кикнуть пользователя с высшей ролью!")
         return
     reason = ' '.join(context.args[1:]) or 'Не указана'
     try:
         await context.bot.ban_chat_member(update.effective_chat.id, target_id)
         await context.bot.unban_chat_member(update.effective_chat.id, target_id)
-        await update.message.reply_text(f"✅ Кикнут {context.args[0]}! Причина: {reason}")
+        await update.message.reply_text(f"✅ Кикнут {context.args[0]}!\nПричина: {reason}")
     except:
-        await update.message.reply_text("❌ Ошибка!")
+        await update.message.reply_text("❌ Ошибка при кике!")
 
 async def mute(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -288,16 +323,16 @@ async def mute(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Не найден!")
+        await update.message.reply_text("❌ Пользователь не найден!")
         return
     if not can_manage(user_id, target_id):
-        await update.message.reply_text("❌ Нельзя!")
+        await update.message.reply_text("❌ Нельзя замутить пользователя с высшей ролью!")
         return
     minutes = int(context.args[1]) if len(context.args) > 1 else 5
     reason = ' '.join(context.args[2:]) or 'Не указана'
     data['mutes'][str(target_id)] = True
     save_data()
-    await update.message.reply_text(f"✅ Замучен {context.args[0]} на {minutes} мин! Причина: {reason}")
+    await update.message.reply_text(f"✅ Замучен {context.args[0]} на {minutes} мин!\nПричина: {reason}")
     await asyncio.sleep(minutes * 60)
     data['mutes'][str(target_id)] = False
     save_data()
@@ -314,7 +349,7 @@ async def unmute(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Не найден!")
+        await update.message.reply_text("❌ Пользователь не найден!")
         return
     data['mutes'][str(target_id)] = False
     save_data()
@@ -332,12 +367,16 @@ async def warn(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Не найден!")
+        await update.message.reply_text("❌ Пользователь не найден!")
         return
     reason = ' '.join(context.args[1:]) or 'Не указана'
     data['warns'][str(target_id)] = data['warns'].get(str(target_id), 0) + 1
     save_data()
-    await update.message.reply_text(f"⚠️ Варн {context.args[0]}! Причина: {reason}\nВсего: {data['warns'][str(target_id)]}")
+    await update.message.reply_text(
+        f"⚠️ Варн {context.args[0]}!\n"
+        f"Причина: {reason}\n"
+        f"Всего варнов: {data['warns'][str(target_id)]}"
+    )
 
 async def unwarn(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
@@ -351,16 +390,19 @@ async def unwarn(update: Update, context: CallbackContext):
         target = await context.bot.get_chat_member(update.effective_chat.id, context.args[0])
         target_id = target.user.id
     except:
-        await update.message.reply_text("❌ Не найден!")
+        await update.message.reply_text("❌ Пользователь не найден!")
         return
     if data['warns'].get(str(target_id), 0) > 0:
         data['warns'][str(target_id)] -= 1
         save_data()
-        await update.message.reply_text(f"✅ Снят варн с {context.args[0]}! Осталось: {data['warns'][str(target_id)]}")
+        await update.message.reply_text(
+            f"✅ Снят варн с {context.args[0]}!\n"
+            f"Осталось варнов: {data['warns'][str(target_id)]}"
+        )
     else:
-        await update.message.reply_text("❌ Нет варнов!")
+        await update.message.reply_text("❌ У пользователя нет варнов!")
 
-# ===== ОБРАБОТЧИКИ =====
+# ===== ОБРАБОТЧИК СООБЩЕНИЙ =====
 async def handle_message(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if str(user_id) in data['banned']:
@@ -368,31 +410,39 @@ async def handle_message(update: Update, context: CallbackContext):
         return
     if data['mutes'].get(str(user_id), False):
         await update.message.delete()
-        await update.message.reply_text("🔇 Вы в муте!")
+        await update.message.reply_text("🔇 Вы в муте! Не пишите.")
 
+# ===== ОБРАБОТЧИК ТЕКСТА ДЛЯ ПАНЕЛИ =====
 async def handle_text(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    if context.user_data.get('action') == 'give_role':
+    if not is_creator(user_id):
+        return
+    action = context.user_data.get('action')
+    if action == 'give_role':
         parts = update.message.text.split()
         if len(parts) == 2:
             target_id, role = parts
             if role in ROLES:
-                data['roles'][target_id] = role
+                data['roles'][str(target_id)] = role
                 save_data()
-                await update.message.reply_text(f"✅ Выдана роль {role}!")
+                await update.message.reply_text(f"✅ Пользователю `{target_id}` выдана роль **{role}**!", parse_mode='Markdown')
             else:
-                await update.message.reply_text("❌ Роль не найдена!")
+                await update.message.reply_text(f"❌ Роль '{role}' не существует!\nДоступные роли:\n" + "\n".join(ROLE_NAMES))
+        else:
+            await update.message.reply_text("❌ Неверный формат!\nНужно: `ID Роль`\nПример: `7743220894 Администратор`")
         context.user_data['action'] = None
-    elif context.user_data.get('action') == 'remove_role':
+    elif action == 'remove_role':
         parts = update.message.text.split()
         if len(parts) == 2:
             target_id, role = parts
-            if data['roles'].get(target_id) == role:
-                data['roles'][target_id] = 'Участник'
+            if data['roles'].get(str(target_id)) == role:
+                data['roles'][str(target_id)] = 'Участник'
                 save_data()
-                await update.message.reply_text(f"✅ Забрана роль {role}!")
+                await update.message.reply_text(f"✅ У пользователя `{target_id}` забрана роль **{role}**!", parse_mode='Markdown')
             else:
-                await update.message.reply_text("❌ Нет такой роли!")
+                await update.message.reply_text(f"❌ У пользователя нет роли {role}!")
+        else:
+            await update.message.reply_text("❌ Неверный формат!\nНужно: `ID Роль`\nПример: `7743220894 Администратор`")
         context.user_data['action'] = None
 
 # ===== ФЛАСК ДЛЯ RENDER =====
@@ -433,12 +483,10 @@ app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new
 
 # ===== ЗАПУСК =====
 if __name__ == '__main__':
-    # Запускаем Flask в отдельном потоке
     flask_thread = threading.Thread(target=run_flask)
     flask_thread.start()
-    
     print("🤖 Бот BLUE RUSSIA запущен!")
     print(f"👑 Основатель: {FOUNDER_NAME}")
     print(f"🤖 Создатель: @eaxpa")
-    
+    print(f"📋 Всего ролей: {len(ROLES)}")
     app.run_polling()
